@@ -1,0 +1,235 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Basic Regression
+
+```{r}
+library(tidyverse)
+library(moderndive)
+library(skimr)
+library(gapminder)
+```
+
+## One numerical explanatory variable
+
+Examine the relationship between a professor's ratemyprofessor.com rating as a function of their beauty score. We can model this relationship using simple linear regression with a single explanatory variable, beauty, ($x$), and a single numerical outcome variable: rating ($y$).
+
+### EDA of beauty average and score
+
+```{r}
+evals_ch5 <- evals %>% 
+  select(ID, score, bty_avg, age)
+
+glimpse(evals_ch5)
+```
+
+Calculate univariate summary stats with `summarize`
+
+```{r}
+evals_ch5 %>% 
+  summarize(mean_bty_avg = mean(bty_avg), 
+            mean_score = mean(score),
+            median_bty_avg = median(bty_avg), 
+            median_score = median(score))
+```
+
+Calculate univariate summary stats with `skimr`
+
+```{r}
+evals_ch5 %>% select(score, bty_avg) %>% skim()
+```
+
+Use `cor` to calculate $r$, a bivariate summary stat:
+
+```{r}
+evals_ch5 %>%
+  summarize(correlation = cor(score, bty_avg))
+```
+```{r}
+evals_ch5 %>% 
+  ggplot(aes(x = bty_avg, y = score)) +
+    geom_jitter() + 
+    labs(x = "Beauty Score",
+         y = "Teaching Score",
+         title = "Scatterplot of relationship of teaching and beauty scores") + 
+    geom_smooth(method = "lm", se = FALSE)
+```
+
+### EDA of age and score
+
+```{r}
+evals_ch5 %>% select(age, score) %>% skim()
+```
+
+```{r}
+evals_ch5 %>% summarize(correlation = cor(score, age))
+```
+
+```{r}
+evals_ch5 %>% 
+  ggplot(aes(x = age, y = score)) +
+    geom_jitter() +
+    labs(x = "Age",
+         y = "Score") +
+    geom_smooth(method = "lm", se = FALSE)
+```
+
+### Simple linear regression
+
+$$\hat{y} = b_0 + b_1 \cdot x$$
+
+```{r}
+library(broom)
+score_model <- lm(score ~ bty_avg, data = evals_ch5)
+tidy(score_model)
+```
+
+$$\widehat{score} = b_0 + b_{bty\_avg} \cdot \textrm{bty_avg}$$
+$$ = 3.88 + 0.067 \cdot \textrm{bty_avg}$$
+
+```{r}
+age_model <- lm(score ~ age, data = evals_ch5)
+tidy(age_model)
+```
+$$ = 4.46 - 0.006 \cdot \textrm{age}$$
+#### Residuals
+
+```{r}
+augment(score_model)
+```
+
+## Regression with one categorical explanatory variable
+
+### EDA of mean life expectancy by continent
+
+Examine the relationship between continent and life expectancy.
+
+```{r}
+gapminder2007 <- gapminder %>% 
+  filter(year == 2007) %>% 
+  select(country, lifeExp, continent, gdpPercap)
+
+glimpse(gapminder2007)
+```
+```{r}
+gapminder2007 %>% 
+  select(lifeExp, continent) %>% 
+  skim()
+```
+```{r}
+gapminder2007 %>% 
+  ggplot(aes(x = lifeExp)) +
+    geom_density() +
+    geom_rug(aes(x = lifeExp, y = 0), position = position_jitter(height = 0))
+```
+```{r}
+gapminder2007 %>% 
+  ggplot(aes(x = lifeExp)) +
+    geom_histogram(binwidth = 5, color = 'white') +
+    facet_wrap(~continent)
+```
+```{r}
+gapminder2007 %>% 
+  ggplot(aes(x = continent, y = lifeExp)) +
+    geom_boxplot()
+```
+
+```{r}
+gapminder2007 %>% group_by(continent) %>% select(continent, lifeExp) %>% skim()
+```
+
+What are the various mean life expectancy values relative to Africa's?
+
+```{r}
+gapminder2007 %>% 
+  group_by(continent) %>% 
+  summarize(mean = mean(lifeExp)) %>% 
+  mutate(`Difference vs Africa` = mean - .[[1,2]])
+```
+
+### EDA of GDP per Capita by continent
+
+```{r}
+gapminder2007 %>% 
+  select(continent, gdpPercap) %>% 
+  skim()
+```
+```{r}
+gapminder2007 %>% 
+  ggplot(aes(x = gdpPercap)) +
+    geom_histogram(binwidth = 5000, color = 'white')
+```
+```{r}
+gapminder2007 %>% 
+  ggplot(aes(x = gdpPercap)) +
+    geom_histogram(binwidth = 5000, color = 'white') +
+    facet_wrap(~ continent)
+```
+```{r}
+gapminder2007 %>% 
+  ggplot(aes(x = continent, y = gdpPercap)) +
+    geom_boxplot()
+```
+```{r}
+gapminder2007 %>% 
+  group_by(continent) %>% 
+  summarize(`mean GDP per capita` = mean(gdpPercap)) %>% 
+  mutate(`Difference vs. Africa` = `mean GDP per capita` - .[[1,2]])
+```
+
+### Creating a regression model
+
+Because the explanatory variable here (continent) is categorical, it can't go directly into the model. Rather, the baseline becomes the intercept, and the estimates for the remaining data are offsets relative to the baseline.
+
+```{r}
+lifeExp_model <- lm(lifeExp ~ continent, data = gapminder2007)
+tidy(lifeExp_model)
+```
+
+Wriring the equation for regression with a single categorical explanatory variable requires introducing the concept of an indicator function. An indicator function, $1_A(x)$ is one that takes the value $1$ if $x$ is in $A$ and $0$ otherwise. So $1_{\textrm{Amer}}(x)$ would be $1$ if $x$ were in the Americas and $0$ otherwise. It's basically a dummy variable.
+
+With that in mind, the equation for the regression line here is just:
+
+$$
+  \hat{y} = \widehat{\textrm{life exp}} = 
+    b_0 + b_{\textrm{Amer}}(x) \cdot 1_{\textrm{Amer}}(x) + 
+    b_{\textrm{Euro}}(x) \cdot 1_{\textrm{Euro}}(x) + \\ 
+    b_{\textrm{Asia}}(x) \cdot 1_{\textrm{Asia}}(x) + 
+    b_{\textrm{Ocean}}(x) \cdot 1_{\textrm{Ocean}}(x) 
+$$
+
+```{r}
+(lifeExp_regression_table <- augment_columns(lifeExp_model, gapminder2007) %>% 
+  select(country, continent, lifeExp, .fitted, .resid))
+```
+
+```{r}
+lifeExp_regression_table %>% 
+  arrange(.resid) %>% 
+  head(5)
+```
+```{r}
+lifeExp_regression_table %>% 
+  arrange(desc(.resid)) %>% 
+  head(5)
+```
+
+
+### Model GDP Per Capita
+
+```{r}
+gdpPercap_model <- lm(gdpPercap ~ continent, data = gapminder2007)
+tidy(gdpPercap_model)
+```
+
+## Best Fit
+
+```{r}
+score_model %>% 
+  augment() %>% 
+  mutate(resid_squared = .resid^2) %>% 
+  summarise(sum_of_squared_residuals = sum(resid_squared))
+```
+

@@ -1,0 +1,64 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(broom)
+trump <- read_csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vT8qHdvTPaRc62hU94ShBcSh04HP3c11b6XZIPMiUDGuwPtifpP7QhHdSHS2YgTRMRTgfUmBYq-L3ZT/pub?gid=1217616678&single=true&output=csv")
+```
+
+```{r}
+glimpse(trump)
+```
+
+```{r}
+trump %>% 
+  ggplot(aes(x = poverty, y = trump_support)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) +
+    labs(x = "% of 'white' households living in poverty",
+         y = "% of votes for Trump in the region")
+```
+```{r}
+cor(trump$trump_support, trump$poverty)
+```
+
+```{r}
+poverty_model <- lm(trump_support ~ poverty, data = trump)
+tidy(poverty_model)
+```
+
+For every percentage point increase in poverty, the model predicts a 2.059 percentage point increase in support for Trump.
+
+```{r}
+augment(poverty_model) %>% 
+  arrange(desc(poverty)) %>% 
+  head()
+```
+
+> Generate a scatterplot with a best-fitting line with non_white as the explanatory variable, and trump_support as the response. Be sure to include an informative title and axis labels to your plot. This will help contextualize it.
+
+```{r}
+trump %>% 
+  ggplot(aes(x = non_white, y = trump_support)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se = FALSE)
+```
+```{r}
+trump %>% 
+  summarize(correlation = cor(trump_support, non_white))
+```
+
+```{r}
+non_white_mod <- lm(trump_support ~ non_white, data = trump)
+tidy(non_white_mod)
+```
+
+A region with $0%$ non-white voters would have $58.33$ support for Trump. Every percentage point increase in non-white voters is associated with a $.27%$ decrease in support for Trump.
+
+```{r}
+58.33 - (.27 * 70)
+```
+

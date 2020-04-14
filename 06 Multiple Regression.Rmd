@@ -1,0 +1,94 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# Multiple Regression
+
+```{r}
+library(tidyverse)
+library(skimr)
+library(moderndive)
+library(ISLR)
+```
+
+## One numerical and one categorical explanatory variable
+
+### Interaction model
+
+In the `evals` dataset, investigate the relationship between explanatory variables age (numerical) and gender (categorical), and score.
+
+```{r}
+evals_ch6 <- evals %>% 
+  select(ID, age, gender, score)
+
+glimpse(evals_ch6)
+```
+```{r}
+evals_ch6 %>% sample_n(5)
+```
+```{r}
+library(skimr)
+evals_ch6 %>% select(age, gender, score) %>% skim()
+```
+```{r}
+evals_ch6 %>% 
+  summarise(r = cor(age, score))
+```
+```{r}
+evals_ch6 %>% 
+  ggplot(aes(x = age, y = score, color = gender)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se = FALSE)
+```
+
+```{r}
+library(broom)
+score_model_interaction <- lm(score ~ age * gender, data = evals_ch6)
+tidy(score_model_interaction)
+```
+In an interaction model like this, the reqgression lines
+$$\hat{y} = \widehat{score} = b_0 + b_\textrm{age} \cdot \textrm{age} + b_\textrm{male} \cdot 1_\textrm{is male}(x) + b_\textrm{age,male} \cdot \textrm{age} \cdot 1_\textrm{is male}(x)$$
+As was the case with the model using a single categorical explanatory variable, the indicator term $1_\textrm{is male}(x)$ zeroes out if the record is not male. The interaction effect, $b_\textrm{age,male}$ is `age:gendermale` from the regression table. This term indicates the extent to which one variable (`age`) depends on another (`gender`)
+
+Thus the equation for the female line is:
+
+$$\hat{y} = \widehat{score} = 4.883 - .018 \cdot age$$
+Whereas for males it's:
+$$
+\hat{y} = \widehat{score} = (4.883 - .446) + (-.018 + 0.014) \cdot age \\
+= 4.437 - 0.004 \cdot age
+$$
+
+### Parallel slopes
+
+In an interaction model, the explanatory variables can behave differently across groups. In the `age * gender` model, the `age` penalty for men was significantly lower for men than for women.
+
+In a parallel slopes model, only the intercept varies. Rather than `age * gender`, the model is `age + gender`.
+
+```{r}
+score_model_parallel_slopes <- lm(score ~ age + gender, data = evals_ch6)
+tidy(score_model_parallel_slopes)
+```
+
+```{r}
+score_model_parallel_slopes %>% 
+  augment() %>% 
+  ggplot(aes(x = age, y = score, color = gender)) +
+    geom_point() +
+    geom_line(aes(y = .fitted))
+```
+
+### Residuals
+
+```{r}
+score_model_interaction %>% 
+  augment() %>% 
+  select(score, age, gender, .fitted, .resid)
+```
+
+```{r}
+score_model_parallel_slopes %>% 
+  augment() %>% 
+  select(score, age, gender, .fitted, .resid)
+```
+
