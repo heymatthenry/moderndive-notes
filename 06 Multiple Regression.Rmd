@@ -91,4 +91,92 @@ score_model_parallel_slopes %>%
   augment() %>% 
   select(score, age, gender, .fitted, .resid)
 ```
+## Two Numerical Explanatory Variables
 
+Model debt ($y$) as a factor of credit limit ($x_1$) and income ($x_2$).
+
+```{r}
+credit_ch6 <- Credit %>% 
+  as_tibble() %>% 
+    select(ID, debt = Balance, credit_limit = Limit, 
+           income = Income, credit_rating = Rating, age = Age)
+
+glimpse(credit_ch6)
+```
+```{r}
+credit_ch6 %>% sample_n(6)
+```
+```{r}
+credit_ch6 %>% select(debt, credit_limit, age) %>% skim()
+```
+
+```{r}
+credit_ch6 %>% 
+  summarise(r_debt_credit_limit = cor(debt, credit_limit),
+            r_debt_age = cor(debt, age))
+```
+```{r}
+credit_ch6 %>% 
+  select(debt, credit_limit, age) %>% 
+  cor()
+```
+```{r}
+library(patchwork)
+credit_ch6 %>%
+  ggplot(aes(x = credit_limit, y = debt)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se = FALSE) +
+    xlab('credit limit in $') -> p1
+
+credit_ch6 %>%
+  ggplot(aes(x = income, y = debt)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se = FALSE) +
+    xlab('income in $1000') -> p2
+
+p1 + p2
+```
+```{r}
+debt_model <- lm(debt ~ credit_limit + income, data = credit_ch6)
+tidy(debt_model)
+```
+This plots separately show the relationships between credit limit and debt and between income and debt, but in order to show the relationship between all 3, a 3D plot is needed, and the regression surface is a plane rather than a line. 
+
+### Debt, Credit Rating and Age
+
+```{r}
+credit_ch6 %>% 
+  select(debt, credit_rating, age) %>% 
+  skim()
+```
+```{r}
+credit_ch6 %>% 
+  summarise(r_debt_credit_rating = cor(debt, credit_rating), r_debt_age = cor(debt, age))
+```
+```{r}
+p1 <- credit_ch6 %>% 
+  ggplot(aes(x = credit_rating, y = debt)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE)
+p2 <- credit_ch6 %>% 
+  ggplot(aes(x = age, y = debt)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE)
+
+p1 + p2
+```
+
+### Regression Plane
+
+```{r}
+debt_model <- lm(debt ~ credit_limit + income, data = credit_ch6)
+tidy(debt_model)
+```
+Even though credit limit and income are *separately* positively correlated with debt, they are jointly negatively correlated. This is Simpson's paradox, which states that adding an additional variable to a model can reverse or negate a trend observed before adding the new variable.
+
+#### Regression Plane with Debt, Credit Rating and Age
+
+```{r}
+debt_credit_age_model <- lm(debt ~ credit_rating + age, data = credit_ch6)
+tidy(debt_credit_age_model)
+```
