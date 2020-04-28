@@ -7,19 +7,104 @@ output: html_notebook
 library(tidyverse)
 hate_crimes <- read_csv("http://bit.ly/2ItxYg3")
 ```
-## EDA
 
+## Income, Education and Urbanization
+
+* $y$: Median household income in 2016
+* $x_1$: pct. of adults over 25 with a HS degree
+* $x_2$: Categorical variable, describing the level of urbanization in the state.
+
+### EDA
 ```{r}
 glimpse(hate_crimes)
 ```
 ```{r}
 unique(hate_crimes$urbanization)
 ```
+```{r}
+hate_crimes %>% 
+  ggplot(aes(x = hs, y = income, col = urbanization)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE) -> p1
 
+p1
+```
+The relationship between `hs` and `income` appears to be fairly linear, positive, and strong.
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+```{r}
+hate_crimes %>% 
+  filter(complete.cases(.)) %>% 
+  summarise(r_hs_income = cor(income, hs))
+```
+The intercept for high urbanization is greater than that for low urbanization, though the slopes appear to be pretty close to each other. In such cases, a parallel slopes model may suffice to capture the trends without introducing the extra complexity of an interaction term.
+```{r}
+hate_crimes %>% 
+  ggplot(aes(x = urbanization, y = income)) +
+    geom_boxplot()
+```
+```{r}
+model_income <- lm(income ~ hs + urbanization, data = hate_crimes)
+tidy(model_income)
+```
+The equation for this model is:
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+$$
+\hat{y} = -113725 + 1986 \cdot hs - 7333.3 \cdot 1_\textrm{low urbanization}(x)
+$$
+Every percentage point increase in HS graduation rate (for adults over 25) in a state with high urbanization is associated with a \$1986 increase in median income. If the state has low urbanization, median income is \$7333 less.
 
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+This is a parallel slopes model, so the slopes for low and high urbanization are assumed to be the same (1986). The intercept for the high urbanization is -\$113725, and the intercept for low urbanization states is -\$121058.
+
+In a state in which 85% of adults over 25 graduated from high school, the model predicts a median household income of \$55,085. A state with low urbanization and the same HS grad rate would have a median income of \$47,752.
+
+```{r}
+augment(model_income)[2, ]
+```
+Maine's observed median income was \$51,710, but the model predicted a value of \$57752.93
+
+```{r}
+library(gghighlight)
+p1 + gghighlight(state == "Maine", label_key = state)
+```
+## Save the voles
+
+```{r}
+vole_trapping <- read_csv("http://bit.ly/2IgDF0E")
+glimpse(vole_trapping)
+```
+```{r}
+vole_model <- lm(voles ~ veg + soil, data = vole_trapping)
+tidy(vole_model)
+```
+The equation for this model is:
+
+$$
+\widehat{voles} = 15.46 + .26 \cdot veg + 9.10 \cdot 1_\textrm{moist}(x)
+$$
+In habitats with dry soil, every percentage point increase in ground cover is associated with .26 more voles. All else being equal, habitats with moist soil have 9.10 more voles than dry soil habitats. A conservationist should therefore prioritize habitats with wet soil.
+
+```{r}
+vole_model %>%
+  augment() %>% 
+  ggplot(aes(x = veg, y = voles, col = soil)) +
+    geom_point() +
+    geom_line(aes(y = .fitted))
+```
+```{r}
+vole_trapping %>% 
+  ggplot(aes(x = veg, y = voles, col = soil)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = FALSE)
+```
+The slopes are *fairly* close, so the model accuracy doesn't take too big a hit by using parallel slopes.
+
+If conservationists wanted to keep a population of at least 30 voles on a dry site, they should maintain about 56% ground cover.
+
+A habitat with moist soil and 40% ground cover would support a population of about 34.9 voles.
+```{r}
+tribble(~soil, ~veg,
+        "moist", 40) -> new
+
+predict(vole_model, newdata = new)
+```
 
